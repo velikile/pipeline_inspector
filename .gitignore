@@ -1,0 +1,5 @@
+gstshark*
+*.sh
+*.ini
+test_gi.py
+__pycache__

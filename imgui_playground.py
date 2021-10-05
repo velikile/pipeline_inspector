@@ -55,8 +55,8 @@ def main():
     #p3.convert_from_launch("udpsrc port=5001 ! rtph264depay ! avdec_h264 ! queue ! videoconvert ! autovideosink")
     p3.convert_from_launch("udpsrc port=5001 ! capsfilter ! rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! autovideosink")
     pipelines.append(p3)
-    p4 = Pipeline([],'video_pipe1')
-    p4.convert_from_launch("udpsrc port=5001 ! capsfilter ! rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! autovideosink")
+    p4 = Pipeline([],'video_pipe_crop')
+    p4.convert_from_launch("udpsrc port=5001 ! capsfilter ! rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! videocrop ! autovideosink")
     pipelines.append(p4)
 
     glfw.set_time(0)
