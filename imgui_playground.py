@@ -37,8 +37,8 @@ def main():
     gl.glDisable(gl.GL_DEPTH_TEST)
     # Loop until the user closes the window
     cycle_counter = 0
-    frametimes = [[x,0] for x in range(g_graph_size)]
-    fps= [[x,0] for x in range(g_graph_size)]
+    frametimes = [0 for x in range(g_graph_size)]
+    fps= [0 for x in range(g_graph_size)]
     pipelines = []
     frame_time = 0
     p = Pipeline([],'video_pipe')
@@ -94,7 +94,6 @@ def main():
             if imgui.button("stop_pipeline"):
                 p.stop()
             imgui.pop_id()
-
             if p.gui_expanded:
                 imgui.indent()
                 for e in p.p:
@@ -131,12 +130,12 @@ def main():
                                     else:
                                         e.set_property(key,val)
                             elif type(val) == float :
-                                changed,val = imgui.input_float(key,val)
+                                changed,val = imgui.input_float(key,val,-1,32)
                                 if changed :
                                     e.set_property(key,val)
                             elif type(val) == int :
                                 try:
-                                    changed,val = imgui.input_float(key,val)
+                                    changed,val = imgui.input_float(key,val,-1,32)
                                     if changed and val.is_integer() :
                                         e.set_property(key,int(val))
                                 except :
@@ -154,6 +153,11 @@ def main():
                                     e.set_property_dict(key,val['selected'],val)
                             elif type(val) == list :
                                 imgui.text(','.join(str(val)))
+                            elif type(val) == str:
+                                changed,val = imgui.input_text(key,val,512,32)
+                                if changed :
+                                    e.set_property(key,val)
+
 
                             imgui.pop_style_color()
 
@@ -181,18 +185,21 @@ def main():
 
         # draw text label inside of current window
         if frame_time > 0:
+            ftarray = np.array(frametimes)
+            fmax = np.max(ftarray)
+            fmin = np.min(ftarray)
             imgui.push_style_color(imgui.COLOR_TEXT, 1.0, 0.0, 0.0)
-            imgui.text(f"frame_time :{frame_time}")
+            imgui.text(f"frame_time :{frame_time} min {fmin} max {fmax}")
             imgui.push_style_color(imgui.COLOR_TEXT, 1.0, 0.0, 1.0)
-            imgui.text(f"fps: {1000/frame_time}")
+            imgui.text(f"fps: {1000/frame_time} min {1000/fmax} max {1000/fmin}")
             imgui.pop_style_color(2)
 
         graph_w= 1000
         graph_h = 250
         drawlist = imgui.get_window_draw_list()
         xoff,yoff = imgui.get_cursor_screen_pos()
-        fps_draw = [(x%graph_w+xoff,y+yoff) for x,y in fps]
-        frametimedraw = [(x%graph_w+xoff,y+yoff) for x,y in frametimes]
+        fps_draw = [(x%graph_w+xoff,y+yoff) for x,y in enumerate(fps)]
+        frametimedraw = [(x%graph_w+xoff,y+yoff) for x,y in enumerate(frametimes)]
         drawlist.add_polyline(fps_draw,imgui.get_color_u32_rgba(1,0,0,1), closed=False, thickness=1)
         drawlist.add_polyline(frametimedraw,imgui.get_color_u32_rgba(1,0,1,1), closed=False, thickness=1)
         imgui.set_cursor_screen_pos((xoff,yoff + graph_h))
@@ -266,9 +273,12 @@ def main():
 
 
 
-        frameindex = cycle_counter % len(frametimes)
-        frametimes[frameindex][1] = frame_time
-        fps[frameindex][1] = 1000/frame_time
+        #frameindex = cycle_counter % len(frametimes)
+        frametimes[0:-1] = frametimes[1:]
+        frametimes[-1] = frame_time
+        fps[0:-1] = fps[1:]
+        fps[-1] = 1000/frame_time
+
         # Swap front and back buffers
         glfw.swap_buffers(window)
         gl.glClear(gl.GL_COLOR_BUFFER_BIT)
