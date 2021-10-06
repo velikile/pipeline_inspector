@@ -12,9 +12,16 @@ import numpy as np
 from gi.repository import Gst
 
 g_graph_size = 400
+g_gui_gst_launch_line = ''
+g_gui_gst_launch_line_error = ''
+
+def iter(r,end):
+    for i in range(len(r)):
+        yield r[(end+i+1)%len(r)]
 
 def main():
 
+    frameindex = 0
     if not glfw.init():
         return
     # Create a windowed mode window and its OpenGL context
@@ -58,6 +65,7 @@ def main():
     p4 = Pipeline([],'video_pipe_crop')
     p4.convert_from_launch("udpsrc port=5001 ! capsfilter ! rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! videocrop ! autovideosink")
     pipelines.append(p4)
+    pipelines_to_remove = set()
 
     glfw.set_time(0)
     while not glfw.window_should_close(window):
@@ -72,7 +80,7 @@ def main():
         ## open new window context
         imgui.begin("pipeline selection", True)
         metered_elements = []
-        for p in pipelines:
+        for eind,p in enumerate(pipelines):
             if p.state == 'stopped':
                 imgui.push_style_color(imgui.COLOR_HEADER, 1.0, 0.0, 0.0)
             elif p.state == 'started':
@@ -81,18 +89,20 @@ def main():
             imgui.pop_style_color()
             imgui.push_id(str(p))
             imgui.same_line(spacing=50)
-            if imgui.button("start_pipeline"):
-                if p == pipelines[3]:
-                    print('setting_clock')
-                    print(pipelines[0].get_start_time())
-                    print(p.get_start_time())
-                    p.set_start_time(pipelines[0].get_start_time())
-                    print(p.get_start_time())
+            if imgui.button("start"):
                 p.start()
-                print(p.get_start_time())
             imgui.same_line(spacing=10)
-            if imgui.button("stop_pipeline"):
+            if imgui.button("stop"):
                 p.stop()
+            imgui.same_line(spacing=10)
+            if imgui.button("remove"):
+                print(f"deleting {eind}")
+                pipelines_to_remove.add(eind)
+
+            if p.latency:
+                imgui.same_line(spacing=10)
+                imgui.text(str(p.latency))
+
             imgui.pop_id()
             if p.gui_expanded:
                 imgui.indent()
@@ -198,8 +208,8 @@ def main():
         graph_h = 250
         drawlist = imgui.get_window_draw_list()
         xoff,yoff = imgui.get_cursor_screen_pos()
-        fps_draw = [(x%graph_w+xoff,y+yoff) for x,y in enumerate(fps)]
-        frametimedraw = [(x%graph_w+xoff,y+yoff) for x,y in enumerate(frametimes)]
+        fps_draw = [(x%graph_w+xoff,y+yoff) for x,y in enumerate(iter(fps,frameindex))]
+        frametimedraw = [(x%graph_w+xoff,y+yoff) for x,y in enumerate(iter(frametimes,frameindex))]
         drawlist.add_polyline(fps_draw,imgui.get_color_u32_rgba(1,0,0,1), closed=False, thickness=1)
         drawlist.add_polyline(frametimedraw,imgui.get_color_u32_rgba(1,0,1,1), closed=False, thickness=1)
         imgui.set_cursor_screen_pos((xoff,yoff + graph_h))
@@ -210,7 +220,11 @@ def main():
             if me.name == 'Latency':
                 xoff,yoff = imgui.get_cursor_screen_pos()
                 if me.prev_src_data and me.prev_sink_data:
-                    diff = np.array(me.sink_data)[:,0] - np.array(me.src_data)[:,0]
+                    sink_time_data = np.array(me.sink_data)[:,0]
+                    src_time_data = np.array(me.src_data)[:,0]
+
+                    diff = sink_time_data - src_time_data
+                    #diff = np.array(iter(sink_time_data,me.sink_data_index)) - np.array(iter(src_time_data,me.src_data_index))
                     def clamp_to_zero(x):
                         return x if x >0 else 0
                     func = np.vectorize(clamp_to_zero)
@@ -257,6 +271,28 @@ def main():
         ## close current window context
         imgui.end()
 
+        global g_gui_gst_launch_line_error,g_gui_gst_launch_line
+        imgui.begin('Add a pipeline',True)
+        changed,g_gui_gst_launch_line = imgui.input_text('launch',g_gui_gst_launch_line,2048)
+        imgui.same_line(spacing = 30)
+        if imgui.button('apply'):
+            p = Pipeline([],str(id(g_gui_gst_launch_line)))
+            try:
+                if p.convert_from_launch(g_gui_gst_launch_line):
+                    pipelines.append(p)
+                    g_gui_gst_launch_line = ''
+                    g_gui_gst_launch_line_error = ''
+            except Exception as e:
+                g_gui_gst_launch_line_error = e.args
+
+        if g_gui_gst_launch_line_error :
+            imgui.push_style_color(imgui.COLOR_TEXT, 0.5,1.0, 1.0)
+            imgui.text(f'error parsing : {g_gui_gst_launch_line} : {g_gui_gst_launch_line_error}')
+            imgui.pop_style_color()
+
+
+        imgui.end()
+
         ## pass all drawing comands to the rendering pipeline
         ## and close frame context
         imgui.render()
@@ -270,14 +306,18 @@ def main():
         else:
             time.sleep(0)
 
+        frameindex = cycle_counter % len(frametimes)
+        frametimes[frameindex] = frame_time
+        fps[frameindex] = 1000/frame_time
 
+        for pr in pipelines_to_remove:
+            del pipelines[pr]
+        pipelines_to_remove = set()
 
-
-        #frameindex = cycle_counter % len(frametimes)
-        frametimes[0:-1] = frametimes[1:]
-        frametimes[-1] = frame_time
-        fps[0:-1] = fps[1:]
-        fps[-1] = 1000/frame_time
+        #frametimes[0:-1] = frametimes[1:]
+        #frametimes[-1] = frame_time
+        #fps[0:-1] = fps[1:]
+        #fps[-1] = 1000/frame_time
 
         # Swap front and back buffers
         glfw.swap_buffers(window)

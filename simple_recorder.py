@@ -207,6 +207,7 @@ class Pipeline:
         self.gui_name = name
         self.state = 'stopped'
         self.clock = None
+        self.latency = None
 
     def get_all_pads(self):
         pads = []
@@ -286,6 +287,7 @@ class Pipeline:
         return self.p[index]
 
     def on_bus_message(self,bus, message):
+        self.latency = self.gst_pipeline.get_latency()
         message: Gst.Message
         t = message.type
         if t == Gst.MessageType.TAG:
