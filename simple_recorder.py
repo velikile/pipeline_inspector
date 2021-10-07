@@ -307,7 +307,8 @@ class Pipeline:
     def convert_from_launch(self,gst_text):
 
         def process(gste,pipeline):
-            props = dict([(p.name,[gste.get_property(p.name),p]) for p in gste.list_properties()])
+            print(dir(gste))
+            props = dict([(p.name,[gste.get_property(p.name),p]) for p in gste.list_properties() if p.flags & GObject.ParamFlags.READABLE])
             elem_name = str(type(gste)).split('\'')[1].split('.')[1].lower()
             to_delete = set()
             for key,value in props.items():
@@ -362,6 +363,8 @@ class Pipeline:
                 self.bus.connect('message', self.on_bus_message)
                 print(self.bus.poll(Gst.MessageType.EOS | Gst.MessageType.ERROR,0))
             self.gst_pipeline.iterate_elements().foreach(process,self)
+            print(self.gst_pipeline.numchildren)
+            print(self.gst_pipeline.children)
         elif error:
             raise Exception('Some thing wrong with the pipeline',error)
 
