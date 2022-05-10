@@ -26,5 +26,5 @@ pip install imgui[glfw]
 
 ### Run 
 ```
-python3 imgui_playground.py
+python3 inspector.py 
 ```
