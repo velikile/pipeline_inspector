@@ -7,7 +7,7 @@ from math import sin
 from array import array
 seconds_per_frame = 1/60
 loop_window_width = 1000
-from simple_recorder import Pipeline
+from gst_engine import Pipeline
 import numpy as np
 from gi.repository import Gst
 
